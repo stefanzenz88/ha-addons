@@ -1,5 +1,5 @@
 name: Checkmk
-version: "2.5.0p17"
+version: "2.5.0p18"
 slug: checkmk
 description: Checkmk Community – Netzwerk- und Infrastruktur-Monitoring (SNMP, Ping, Agenten)
 url: https://github.com/stefanzenz88/ha-addons/tree/main/checkmk

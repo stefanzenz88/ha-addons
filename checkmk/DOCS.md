@@ -6,7 +6,7 @@ Netzwerk- und Infrastruktur-Monitoring auf Basis des offiziellen Images `checkmk
 
 1. Unter **Konfiguration** ein `admin_password` setzen (ohne Anführungszeichen) und speichern.
 2. Add-on starten. Der erste Start dauert einige Minuten (Site `cmk` wird angelegt).
-3. Weboberfläche: `http://<HA-IP>:8090/cmk/` – Benutzer `cmkadmin`.
+3. Weboberfläche: `http://<HA-IP>:8095/cmk/` – Benutzer `cmkadmin`.
 
 Das Kennwort aus der Konfiguration wird nur beim ersten Anlegen verwendet. Später das Kennwort in Checkmk selbst ändern und den Wert in der Add-on-Konfiguration wieder leeren.
 
@@ -24,4 +24,4 @@ Das Kennwort aus der Konfiguration wird nur beim ersten Anlegen verwendet. Spät
 ## Hinweise
 
 - Nur amd64 (x86) – wie das offizielle Checkmk-Image.
-- Abfragen (SNMP, Ping) laufen aus dem Container ins LAN; Port 8090 nur im LAN freigeben.
+- Abfragen (SNMP, Ping) laufen aus dem Container ins LAN; Port 8095 nur im LAN freigeben.

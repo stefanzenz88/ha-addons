@@ -9,7 +9,7 @@ init: false
 startup: services
 boot: auto
 ports:
-  5000/tcp: 8090
+  5000/tcp: 8095
 ports_description:
   5000/tcp: Checkmk-Weboberfläche (Pfad /cmk/)
 webui: "http://[HOST]:[PORT:5000]/cmk/"

@@ -1,0 +1,32 @@
+name: Checkmk
+version: "2.5.0p17"
+slug: checkmk
+description: Checkmk Community – Netzwerk- und Infrastruktur-Monitoring (SNMP, Ping, Agenten)
+url: https://github.com/stefanzenz88/ha-addons/tree/main/checkmk
+arch:
+  - amd64
+init: false
+startup: services
+boot: auto
+ports:
+  5000/tcp: 8090
+ports_description:
+  5000/tcp: Checkmk-Weboberfläche (Pfad /cmk/)
+webui: "http://[HOST]:[PORT:5000]/cmk/"
+# Site-Daten bleiben über Updates/Neubau erhalten (Host: /addon_configs/<repo>_checkmk)
+map:
+  - type: addon_config
+    path: /omd/sites
+    read_only: false
+options:
+  admin_password: ""
+  timezone: Europe/Vienna
+schema:
+  admin_password: password
+  timezone: str
+# Messwert-Historie und Logs nicht ins HA-Backup (Konfiguration schon)
+backup_exclude:
+  - "*/var/pnp4nagios/perfdata/*"
+  - "*/var/check_mk/rrd/*"
+  - "*/var/log/*"
+  - "*/tmp/*"

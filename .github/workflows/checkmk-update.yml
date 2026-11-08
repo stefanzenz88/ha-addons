@@ -1,0 +1,40 @@
+name: Checkmk-Update prüfen
+
+on:
+  schedule:
+    - cron: "17 4 * * *"   # täglich 04:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Neue Checkmk-Version suchen
+        id: check
+        run: python3 .github/scripts/checkmk_update.py
+
+      - name: Patch-Update committen
+        if: steps.check.outputs.updated != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add checkmk/config.yaml checkmk/build.yaml checkmk/CHANGELOG.md
+          git commit -m "Checkmk ${{ steps.check.outputs.updated }}"
+          git push
+
+      - name: Neue Hauptversion melden (kein automatischer Sprung)
+        if: steps.check.outputs.major_available != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEU: ${{ steps.check.outputs.major_available }}
+        run: |
+          titel="Checkmk-Hauptversion $NEU verfügbar"
+          if ! gh issue list --state open --search "$titel in:title" --json number -q '.[0].number' | grep -q .; then
+            gh issue create --title "$titel" --body "Eine neue Checkmk-Hauptversion ($NEU) ist auf Docker Hub verfügbar. Hauptversionen werden nicht automatisch übernommen: vorher Release Notes prüfen, Backup machen und dann Version in checkmk/config.yaml und checkmk/build.yaml anheben (immer nur eine Hauptversion pro Schritt)."
+          fi

@@ -1,0 +1,30 @@
+name: "Netz-Logsammler"
+version: "1.0.0"
+slug: logsammler
+description: "Empfängt das Syslog der FortiGate, bewahrt es wochenlang durchsuchbar auf und meldet Upload je Gerät, Zielländer und auffällige Verbindungen an Home Assistant"
+url: "https://github.com/stefanzenz88/ha-addons"
+arch:
+  - amd64
+  - aarch64
+init: false
+host_network: true
+startup: services
+boot: auto
+ingress: true
+ingress_port: 8097
+panel_icon: mdi:text-box-search-outline
+panel_title: Netz-Logs
+options:
+  port: 5514
+  webhook_url: ""
+  aufbewahrung_tage: 21
+  erlaubte_absender:
+    - "10.0.0.254"
+  stand_intervall_sekunden: 300
+schema:
+  port: port
+  webhook_url: str?
+  aufbewahrung_tage: int(1,365)
+  erlaubte_absender:
+    - str
+  stand_intervall_sekunden: int(60,3600)

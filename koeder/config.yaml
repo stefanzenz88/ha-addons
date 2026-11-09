@@ -1,5 +1,5 @@
 name: "Netz-Köder (Honeypot)"
-version: "1.0.0"
+version: "1.0.1"
 slug: koeder
 description: "Köder-Dienst fürs Heimnetz: meldet jeden Verbindungsversuch auf Ports, die niemand benutzen sollte, an Home Assistant"
 url: "https://github.com/stefanzenz88/ha-addons"

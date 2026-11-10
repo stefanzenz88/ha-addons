@@ -555,11 +555,14 @@ class UI(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         roh = self.rfile.read(min(int(self.headers.get('Content-Length', 0) or 0), 100000)).decode('utf-8', 'replace')
         if u.path.endswith('/api/audit'):
-            d = json.loads(roh or '{}')
-            e = AUDIT.eintragen(d.get('kategorie') or 'Maßnahme', d.get('titel') or d.get('aktion') or 'Maßnahme', d.get('objekt', ''),
-                                d.get('details', ''), d.get('wer') or self.benutzer() or 'System', d.get('quelle') or 'Manuell',
-                                d.get('ereignis_zeit'), bool(d.get('nachgetragen') or d.get('ereignis_zeit')), d.get('beleg', ''))
-            self.antwort(json.dumps({'nr': e['nr'], 'hash': e['hash']}), 'application/json')
+            daten = json.loads(roh or '{}')
+            out = []
+            for d in (daten if isinstance(daten, list) else [daten])[:200]:  # Liste = mehrere Einträge in Reihenfolge
+                e = AUDIT.eintragen(d.get('kategorie') or 'Maßnahme', d.get('titel') or d.get('aktion') or 'Maßnahme', d.get('objekt', ''),
+                                    d.get('details', ''), d.get('wer') or self.benutzer() or 'System', d.get('quelle') or 'Manuell',
+                                    d.get('ereignis_zeit'), bool(d.get('nachgetragen') or d.get('ereignis_zeit')), d.get('beleg', ''))
+                out.append({'nr': e['nr'], 'hash': e['hash'][:16]})
+            self.antwort(json.dumps(out), 'application/json')
         elif u.path.endswith('/audit'):
             f = {k: v[0].strip() for k, v in urllib.parse.parse_qs(roh).items()}
             meldung = ''

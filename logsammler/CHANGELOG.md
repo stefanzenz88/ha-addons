@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1
+- `POST /api/audit` nimmt auch eine Liste von Einträgen an (Nachtragen in einem Schritt).
+
 ## 1.1.0
 - Security-Audit-Log mit Hash-Kette (`/data/audit.jsonl`): jede Änderung an einem Eintrag, jede Lücke und jede Einfügung wird bei der Prüfung erkannt.
 - Quellen: FortiGate-Konfigurationsänderungen und Admin-Anmeldungen (Syslog), NAC-Entscheidungen per Push oder Dashboard, manuelles Sperren/Freigeben, Ein-/Ausschalten von Netzwerk-Automationen, gespeicherte Automationen/Skripte/Dashboards, manuell dokumentierte Maßnahmen (Event `netz_audit` oder Formular).

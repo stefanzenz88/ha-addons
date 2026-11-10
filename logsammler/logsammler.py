@@ -344,15 +344,15 @@ async def ha_bruecke():
                     await ws.send_json({'type': 'auth', 'access_token': TOKEN})
                     if (await ws.receive_json()).get('type') != 'auth_ok':
                         raise RuntimeError('Anmeldung an Home Assistant fehlgeschlagen')
-                    await ws.send_json({'id': 99, 'type': 'config/auth/list'})
-                    for i, et in enumerate(HA_EREIGNISSE, 1):
+                    await ws.send_json({'id': 1, 'type': 'config/auth/list'})
+                    for i, et in enumerate(HA_EREIGNISSE, 2):  # IDs müssen steigen
                         await ws.send_json({'id': i, 'type': 'subscribe_events', 'event_type': et})
                     log('Audit: mit Home Assistant verbunden,', len(PERSONEN), 'Personen')
                     async for m in ws:
                         if m.type != aiohttp.WSMsgType.TEXT:
                             continue
                         d = json.loads(m.data)
-                        if d.get('id') == 99 and d.get('type') == 'result' and d.get('success'):
+                        if d.get('id') == 1 and d.get('type') == 'result' and d.get('success'):
                             for b in d.get('result') or []:  # Benutzer ohne Person (z. B. Token-Benutzer) mit Namen
                                 PERSONEN.setdefault(b['id'], b.get('name') or b['id'][:8])
                         elif d.get('type') == 'event':

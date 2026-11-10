@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.3
+- Fix: Websocket-IDs aufsteigend (Abos wurden in 1.1.2 abgelehnt).
+
 ## 1.1.2
 - Benutzer ohne Person (z. B. Token-Benutzer) werden mit ihrem HA-Namen protokolliert; nachgetragene Einträge ohne Uhrzeit zeigen nur das Datum.
 

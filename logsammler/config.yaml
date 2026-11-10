@@ -1,7 +1,7 @@
 name: "Netz-Logsammler"
-version: "1.0.0"
+version: "1.1.0"
 slug: logsammler
-description: "Empfängt das Syslog der FortiGate, bewahrt es wochenlang durchsuchbar auf und meldet Upload je Gerät, Zielländer und auffällige Verbindungen an Home Assistant"
+description: "Empfängt das Syslog der FortiGate (Archiv mit Suche, Upload je Gerät, Alarme) und führt ein fälschungserkennbares Security-Audit-Log für Home Assistant und FortiGate"
 url: "https://github.com/stefanzenz88/ha-addons"
 arch:
   - amd64
@@ -10,10 +10,11 @@ init: false
 host_network: true
 startup: services
 boot: auto
+homeassistant_api: true
 ingress: true
 ingress_port: 8097
 panel_icon: mdi:text-box-search-outline
-panel_title: Netz-Logs
+panel_title: Netz-Logs & Audit
 options:
   port: 5514
   webhook_url: ""

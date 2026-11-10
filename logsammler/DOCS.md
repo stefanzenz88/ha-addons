@@ -6,6 +6,17 @@ Empfängt das Syslog der FortiGate und macht daraus drei Dinge:
 2. **Suche:** Seitenleiste → *Netz-Logs*. Mehrere Begriffe (MAC, IP, Land, Port …) müssen alle vorkommen; neueste Treffer zuerst.
 3. **Auswertung je Gerät** (Verkehr Richtung Internet): Upload heute, Zielländer, Verbindungen über auffällige Ports, 7-Tage-Verlauf. Alle 5 Minuten geht der Stand per Webhook an Home Assistant, Alarme sofort (geprüft jede Minute).
 
+## Security-Audit-Log
+Dokumentiert Änderungen und Maßnahmen nachweisbar. Jeder Eintrag enthält den SHA-256-Hash des vorherigen; die Seite „Audit-Log“ prüft die ganze Kette bei jedem Aufruf und zeigt rot, sobald ein Eintrag verändert, entfernt oder eingeschoben wurde. Einträge werden nie geändert – Korrekturen kommen als neuer Eintrag.
+
+Automatisch erfasst:
+- FortiGate: Konfigurationsänderungen (wer, über welche Oberfläche, welcher Pfad, welche Werte) und Admin-Anmeldungen
+- Home Assistant: NAC-Freigaben/-Ablehnungen (Push oder Dashboard, mit Person), manuelles Sperren/Freigeben, Sperr-Schalter, Netzwerk-Automationen ein/aus, gespeicherte Automationen, Skripte und Netzwerk-Dashboards
+
+Manuell: Formular auf der Seite „Audit-Log“ (Name kommt aus der HA-Anmeldung) oder Event `netz_audit` mit `titel`, `kategorie`, `objekt`, `details`, `beleg`, `ereignis_zeit`.
+
+Export: CSV (Semikolon, Excel-tauglich) mit Hash-Spalten. Täglich wird der Kettenkopf zusätzlich ins HA-Logbuch geschrieben.
+
 ## Alarmregeln
 - Upload > 500 MB **und** > 5× Tagesschnitt der letzten 7 Tage; solange weniger als 3 Tage Verlauf: > 2 GB.
 - Verbindung über FTP 21, SSH 22, Telnet 23, SMTP 25, NetBIOS 139, SMB 445, MS-SQL 1433, RDP 3389, VNC 5900, IRC 6667, Tor 9001/9030/9050.

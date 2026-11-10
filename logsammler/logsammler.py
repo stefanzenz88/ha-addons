@@ -344,6 +344,7 @@ async def ha_bruecke():
                     await ws.send_json({'type': 'auth', 'access_token': TOKEN})
                     if (await ws.receive_json()).get('type') != 'auth_ok':
                         raise RuntimeError('Anmeldung an Home Assistant fehlgeschlagen')
+                    await ws.send_json({'id': 99, 'type': 'config/auth/list'})
                     for i, et in enumerate(HA_EREIGNISSE, 1):
                         await ws.send_json({'id': i, 'type': 'subscribe_events', 'event_type': et})
                     log('Audit: mit Home Assistant verbunden,', len(PERSONEN), 'Personen')
@@ -351,7 +352,10 @@ async def ha_bruecke():
                         if m.type != aiohttp.WSMsgType.TEXT:
                             continue
                         d = json.loads(m.data)
-                        if d.get('type') == 'event':
+                        if d.get('id') == 99 and d.get('type') == 'result' and d.get('success'):
+                            for b in d.get('result') or []:  # Benutzer ohne Person (z. B. Token-Benutzer) mit Namen
+                                PERSONEN.setdefault(b['id'], b.get('name') or b['id'][:8])
+                        elif d.get('type') == 'event':
                             try:
                                 ha_ereignis(d['event'])
                             except Exception as x:
@@ -361,11 +365,12 @@ async def ha_bruecke():
         await asyncio.sleep(15)
 
 def kurz(e):
+    z = e.get('ereignis_zeit') or e['zeit']
     try:
-        t = datetime.fromisoformat(e.get('ereignis_zeit') or e['zeit'])
+        t = datetime.fromisoformat(z)
     except ValueError:
         t = None
-    return {'nr': e['nr'], 'zeit': t.strftime('%d.%m. %H:%M') if t else e['zeit'][:16], 'kat': e['kategorie'], 'wer': e['wer'],
+    return {'nr': e['nr'], 'zeit': (t.strftime('%d.%m.') if len(z) == 10 else t.strftime('%d.%m. %H:%M')) if t else z[:16], 'kat': e['kategorie'], 'wer': e['wer'],
             'aktion': e['aktion'], 'objekt': e.get('objekt', '')[:60], 'nach': bool(e.get('nachgetragen'))}
 
 async def audit_sensor():

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+- Benutzer ohne Person (z. B. Token-Benutzer) werden mit ihrem HA-Namen protokolliert; nachgetragene Einträge ohne Uhrzeit zeigen nur das Datum.
+
 ## 1.1.1
 - `POST /api/audit` nimmt auch eine Liste von Einträgen an (Nachtragen in einem Schritt).
 

@@ -1,5 +1,5 @@
 name: "Netz-Logsammler"
-version: "1.1.1"
+version: "1.1.2"
 slug: logsammler
 description: "Empfängt das Syslog der FortiGate (Archiv mit Suche, Upload je Gerät, Alarme) und führt ein fälschungserkennbares Security-Audit-Log für Home Assistant und FortiGate"
 url: "https://github.com/stefanzenz88/ha-addons"

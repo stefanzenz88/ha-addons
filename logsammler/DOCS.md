@@ -2,7 +2,7 @@
 
 Empfängt das Syslog der FortiGate und macht daraus drei Dinge:
 
-1. **Archiv:** Jede Zeile wird pro Tag komprimiert unter `/data/logs` abgelegt (Standard: 21 Tage).
+1. **Archiv:** Jede Zeile landet unter `/data/logs` – der laufende Tag als Klartext, vergangene Tage komprimiert (Standard: 21 Tage).
 2. **Suche:** Seitenleiste → *Netz-Logs*. Mehrere Begriffe (MAC, IP, Land, Port …) müssen alle vorkommen; neueste Treffer zuerst.
 3. **Auswertung je Gerät** (Verkehr Richtung Internet): Upload heute, Zielländer, Verbindungen über auffällige Ports, 7-Tage-Verlauf. Alle 5 Minuten geht der Stand per Webhook an Home Assistant, Alarme sofort (geprüft jede Minute).
 

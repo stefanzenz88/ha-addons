@@ -2,7 +2,7 @@
 """Netz-Logsammler: empfängt FortiGate-Syslog (UDP/TCP), archiviert die Rohzeilen
 tageweise komprimiert, wertet den Internet-Verkehr je Gerät aus und meldet
 Stand + Alarme per Webhook an Home Assistant. Suchseite über HA-Ingress."""
-import asyncio, gzip, html, json, os, re, threading, time, urllib.parse, urllib.request
+import asyncio, gzip, zlib, html, json, os, re, threading, time, urllib.parse, urllib.request
 from collections import deque
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -78,18 +78,64 @@ def tageswechsel():
     log('Tageswechsel →', t)
 
 # ---------------------------------------------------------------- Rohdaten-Archiv
+def gz_lesen(pfad):
+    """Liest gzip (auch mehrere Abschnitte) so weit wie möglich – bricht an einer beschädigten Stelle sauber ab."""
+    d, rest = zlib.decompressobj(31), b''
+    try:
+        with open(pfad, 'rb') as f:
+            while True:
+                roh = f.read(4096)
+                if not roh:
+                    break
+                while roh:
+                    sicher = d.copy()
+                    try:
+                        teil = d.decompress(roh)
+                    except zlib.error:  # Rest vor der beschädigten Stelle Byte für Byte retten
+                        d, teil = sicher, b''
+                        for i in range(len(roh)):
+                            try:
+                                teil += d.decompress(roh[i:i + 1])
+                            except zlib.error:
+                                break
+                        rest += teil
+                        raise
+                    roh = d.unused_data
+                    if roh:  # nächster gzip-Abschnitt
+                        d = zlib.decompressobj(31)
+                    rest += teil
+                    *zeilen, rest = rest.split(b'\n')
+                    for z in zeilen:
+                        yield z.decode('utf-8', 'replace') + '\n'
+    except (OSError, zlib.error):
+        pass
+    if rest:
+        yield rest.decode('utf-8', 'replace') + '\n'
+
 class Archiv:
+    """Laufender Tag als Klartext (absturzsicher), ältere Tage komprimiert."""
     def __init__(self):
         self.tag, self.f, self.seit_flush = None, None, time.time()
+        self.retten()
+
+    def retten(self):
+        # Altbestand aus 1.0/1.1: heutige .log.gz in Klartext überführen (lesbarer Teil bleibt erhalten)
+        gz = os.path.join(LOGDIR, heute() + '.log.gz')
+        if os.path.exists(gz):
+            with open(os.path.join(LOGDIR, heute() + '.log'), 'a', encoding='utf-8') as out:
+                for z in gz_lesen(gz):
+                    out.write(z)
+            os.remove(gz)
+            log('Archiv: heutige komprimierte Datei in Klartext überführt')
 
     def schreiben(self, zeile):
         t = heute()
         if t != self.tag:
             if self.f:
                 self.f.close()
-            self.tag, self.f = t, gzip.open(os.path.join(LOGDIR, t + '.log.gz'), 'ab', compresslevel=6)
-        self.f.write(zeile.encode('utf-8', 'replace') + b'\n')
-        if time.time() - self.seit_flush > 30:
+            self.tag, self.f = t, open(os.path.join(LOGDIR, t + '.log'), 'a', encoding='utf-8', errors='replace')
+        self.f.write(zeile + '\n')
+        if time.time() - self.seit_flush > 10:
             self.flush()
 
     def flush(self):
@@ -98,11 +144,27 @@ class Archiv:
         self.seit_flush = time.time()
 
     def aufraeumen(self):
+        """Vergangene Tage komprimieren, alte löschen (läuft im Hintergrund-Thread)."""
         grenze = (datetime.now() - timedelta(days=TAGE)).strftime('%Y-%m-%d')
-        for n in os.listdir(LOGDIR):
-            if n.endswith('.log.gz') and n[:10] < grenze:
-                os.remove(os.path.join(LOGDIR, n))
+        for n in sorted(os.listdir(LOGDIR)):
+            pf = os.path.join(LOGDIR, n)
+            if n[:10] < grenze and (n.endswith('.log') or n.endswith('.log.gz')):
+                os.remove(pf)
                 log('Archiv gelöscht:', n)
+            elif n.endswith('.log') and n[:10] < heute():
+                with open(pf, 'rb') as ein, gzip.open(pf + '.gz.tmp', 'wb', compresslevel=6) as aus:
+                    while True:
+                        blk = ein.read(1 << 20)
+                        if not blk:
+                            break
+                        aus.write(blk)
+                if os.path.exists(pf + '.gz'):  # Rest aus alter Version anhängen statt überschreiben
+                    with gzip.open(pf + '.gz.tmp', 'ab') as aus:
+                        for z in gz_lesen(pf + '.gz'):
+                            aus.write(z.encode('utf-8'))
+                os.replace(pf + '.gz.tmp', pf + '.gz')
+                os.remove(pf)
+                log('Archiv komprimiert:', n)
 
 ARCHIV = Archiv()
 
@@ -264,7 +326,7 @@ async def zyklus():
             if time.time() - letzter_stand >= STAND_INTERVALL:
                 letzter_stand = time.time()
                 await asyncio.to_thread(senden, {'art': 'stand', 'daten': stand()})
-                ARCHIV.aufraeumen()
+                await asyncio.to_thread(ARCHIV.aufraeumen)
             speichern()
         except Exception as e:
             log('Fehler im Zyklus:', repr(e))
@@ -407,17 +469,15 @@ async def audit_sensor():
 def suchen(text, von, bis, limit=300):
     treffer, n = deque(maxlen=limit), 0
     ARCHIV.flush()
-    for name in sorted(os.listdir(LOGDIR)):
-        if not name.endswith('.log.gz') or not (von <= name[:10] <= bis):
+    for name in sorted(os.listdir(LOGDIR), key=lambda x: (x[:10], x.endswith('.log'))):
+        if not (von <= name[:10] <= bis) or not (name.endswith('.log') or name.endswith('.log.gz')):
             continue
-        try:
-            with gzip.open(os.path.join(LOGDIR, name), 'rt', encoding='utf-8', errors='replace') as f:
-                for z in f:
-                    if all(t in z.lower() for t in text):
-                        n += 1
-                        treffer.append(z.rstrip())
-        except (EOFError, OSError):
-            pass  # heutige Datei wird gerade geschrieben – bis dahin gelesen
+        pf = os.path.join(LOGDIR, name)
+        zeilen = gz_lesen(pf) if name.endswith('.gz') else open(pf, encoding='utf-8', errors='replace')
+        for z in zeilen:
+            if all(t in z.lower() for t in text):
+                n += 1
+                treffer.append(z.rstrip())
     return list(reversed(treffer)), n
 
 CSS = """<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><style>
@@ -445,11 +505,12 @@ def seite_logs(p):
     q = (p.get('q', [''])[0]).strip()
     von = p.get('von', [(datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')])[0]
     bis = p.get('bis', [heute()])[0]
-    dateien = sorted(n for n in os.listdir(LOGDIR) if n.endswith('.log.gz'))
+    dateien = sorted(n for n in os.listdir(LOGDIR) if n.endswith('.log') or n.endswith('.log.gz'))
     groesse = sum(os.path.getsize(os.path.join(LOGDIR, n)) for n in dateien)
+    tage = len({n[:10] for n in dateien})
     zahl = lambda x: f'{x:,}'.replace(',', '.')
     info = (f"Empfangen seit Start: {zahl(STAT['empfangen'])} Zeilen · heute {zahl(S['zeilen'])} · "
-            f"Archiv: {len(dateien)} Tage, {groesse / 1e6:.0f} MB (Aufbewahrung {TAGE} Tage) · "
+            f"Archiv: {tage} Tage, {groesse / 1e6:.0f} MB (Aufbewahrung {TAGE} Tage) · "
             f"Absender: {' / '.join(STAT['absender']) or '–'}")
     if q:
         terme = [t.lower() for t in q.split()]

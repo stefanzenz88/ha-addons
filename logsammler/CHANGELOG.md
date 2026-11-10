@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4
+- Archiv absturzsicher: laufender Tag als Klartext, Komprimierung erst nach Mitternacht. Beschädigte gzip-Dateien werden bis zur Fehlerstelle gelesen; die heutige Datei aus älteren Versionen wird beim Start gerettet.
+
 ## 1.1.3
 - Fix: Websocket-IDs aufsteigend (Abos wurden in 1.1.2 abgelehnt).
 

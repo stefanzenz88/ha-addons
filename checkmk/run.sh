@@ -27,4 +27,19 @@ else
   fi
 fi
 
+# Eigene NagVis-Symbole in die Site kopieren (auch nach Neuanlage, sobald die Site existiert)
+symbole() {
+  local site="/omd/sites/${CMK_SITE_ID}"
+  local ziel="${site}/local/share/nagvis/htdocs/userfiles/images/iconsets"
+  mkdir -p "$ziel" && cp -f /zenz-iconsets/*.png "$ziel"/ \
+    && chown -R --reference="${site}/local" "${site}/local/share/nagvis" \
+    && echo "[addon] NagVis-Symbole installiert ($(ls /zenz-iconsets | wc -l) Dateien)."
+}
+(
+  for i in $(seq 1 120); do
+    if [ -d "/omd/sites/${CMK_SITE_ID}/local" ]; then symbole; break; fi
+    sleep 5
+  done
+) &
+
 exec /docker-entrypoint.sh "$@"

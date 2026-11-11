@@ -40,7 +40,8 @@ def parse(v):
 def main():
     cfg = open(CONFIG, encoding="utf-8").read()
     cur = re.search(r'^version:\s*"?([^"\n]+)"?', cfg, re.M).group(1)
-    cur_t = parse(cur)
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)p(\d+)", cur)  # eigene Revision wie -1 erlaubt
+    cur_t = tuple(int(x) for x in m.groups()) if m else None
     if not cur_t:
         sys.exit(f"Aktuelle Version '{cur}' nicht lesbar")
 

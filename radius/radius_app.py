@@ -65,7 +65,7 @@ def config_schreiben():
     with open(f'{RADDB}/clients.conf', 'w') as f:
         for ip, name in SWITCHES.items():
             kurz = re.sub(r'[^A-Za-z0-9_-]', '', name) or ip.replace('.', '_')
-            f.write(f'client {kurz} {{\n  ipaddr = {ip}\n  secret = "{SECRET}"\n  shortname = {kurz}\n  require_message_authenticator = {ma}\n' + ('  limit_proxy_state = auto\n' if ma == 'auto' else '') + '}}\n')
+            f.write(f'client {kurz} {{\n  ipaddr = {ip}\n  secret = "{SECRET}"\n  shortname = {kurz}\n  require_message_authenticator = {ma}\n' + ('  limit_proxy_state = auto\n' if ma == 'auto' else '') + '}\n')
     # schlanker eigener virtueller Server: nur MAB über files + CHAP/PAP
     for d in ('sites-enabled', 'mods-enabled'):
         for n in os.listdir(f'{RADDB}/{d}'):

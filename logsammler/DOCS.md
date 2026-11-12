@@ -17,6 +17,9 @@ Manuell: Formular auf der Seite „Audit-Log“ (Name kommt aus der HA-Anmeldung
 
 Export: CSV (Semikolon, Excel-tauglich) mit Hash-Spalten. Täglich wird der Kettenkopf zusätzlich ins HA-Logbuch geschrieben.
 
+## ARP-Wächter
+Die NAC der FortiGate sieht nur Geräte, die eine Adresse per DHCP anfragen oder über die Firewall ins Internet gehen. Ein Gerät mit fester IP, das nur im Heimnetz spricht (z. B. ein neuer Drucker), bleibt dort unsichtbar. Der ARP-Wächter spricht alle 5 Minuten jede Adresse in `arp_netz` kurz an, liest die ARP-Tabelle des Hosts und vergleicht jede MAC mit dem Geräte-Inventar (`todo.netzwerk_gerate`). Unbekannte MACs landen – einmalig – als Vorfall im Audit-Log und als Freigabe-Anfrage im NAC-Ablauf (`nac_webhook_url`, Ereignis `arp`).
+
 ## Alarmregeln
 - Upload > 500 MB **und** > 5× Tagesschnitt der letzten 7 Tage; solange weniger als 3 Tage Verlauf: > 2 GB.
 - Verbindung über FTP 21, SSH 22, Telnet 23, SMTP 25, NetBIOS 139, SMB 445, MS-SQL 1433, RDP 3389, VNC 5900, IRC 6667, Tor 9001/9030/9050.

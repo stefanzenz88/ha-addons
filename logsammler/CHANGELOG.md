@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0
+- ARP-Wächter: erkennt alle 5 Minuten Geräte im Heimnetz, deren MAC nicht im Geräte-Inventar steht – auch mit fester IP und ohne Internetverkehr. Meldung über den NAC-Freigabe-Ablauf (Ereignis `arp`) und als Vorfall im Audit-Log. Kontrolle unter `/api/arp`; Meldungen erst mit `arp_melden: true`.
+
 ## 1.1.4
 - Archiv absturzsicher: laufender Tag als Klartext, Komprimierung erst nach Mitternacht. Beschädigte gzip-Dateien werden bis zur Fehlerstelle gelesen; die heutige Datei aus älteren Versionen wird beim Start gerettet.
 

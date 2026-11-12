@@ -1,5 +1,5 @@
 name: "Netz-Logsammler"
-version: "1.1.4"
+version: "1.2.0"
 slug: logsammler
 description: "Empfängt das Syslog der FortiGate (Archiv mit Suche, Upload je Gerät, Alarme) und führt ein fälschungserkennbares Security-Audit-Log für Home Assistant und FortiGate"
 url: "https://github.com/stefanzenz88/ha-addons"
@@ -22,6 +22,10 @@ options:
   erlaubte_absender:
     - "10.0.0.254"
   stand_intervall_sekunden: 300
+  arp_netz: 10.0.0.0/24
+  arp_intervall_sekunden: 300
+  arp_melden: false
+  nac_webhook_url: ""
 schema:
   port: port
   webhook_url: str?
@@ -29,3 +33,7 @@ schema:
   erlaubte_absender:
     - str
   stand_intervall_sekunden: int(60,3600)
+  arp_netz: str
+  arp_intervall_sekunden: int(60,3600)
+  arp_melden: bool
+  nac_webhook_url: str?

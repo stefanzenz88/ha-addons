@@ -2,7 +2,7 @@
 """Netz-Logsammler: empfängt FortiGate-Syslog (UDP/TCP), archiviert die Rohzeilen
 tageweise komprimiert, wertet den Internet-Verkehr je Gerät aus und meldet
 Stand + Alarme per Webhook an Home Assistant. Suchseite über HA-Ingress."""
-import asyncio, gzip, zlib, html, json, os, re, threading, time, urllib.parse, urllib.request
+import asyncio, ipaddress, socket, gzip, zlib, html, json, os, re, threading, time, urllib.parse, urllib.request
 from collections import deque
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -465,6 +465,89 @@ async def audit_sensor():
             AUDIT.geaendert = True
             log('Audit-Sensor:', repr(x))
 
+# ---------------------------------------------------------------- ARP-Wächter: Geräte ohne DHCP / ohne Internetverkehr erkennen
+ARP_NETZ = OPT.get('arp_netz', '10.0.0.0/24')
+ARP_INTERVALL = int(OPT.get('arp_intervall_sekunden', 300))
+ARP_MELDEN = bool(OPT.get('arp_melden', False))
+NAC_WEBHOOK = OPT.get('nac_webhook_url') or ''
+ARPF = '/data/arp.json'
+MAC_RE = re.compile(r'([0-9a-f]{2}(?::[0-9a-f]{2}){5})', re.I)
+ARP = {'stand': 0, 'tabelle': {}, 'unbekannt': [], 'fehler': ''}
+
+def arp_lesen():
+    out = {}
+    with open('/proc/net/arp') as f:
+        for z in f.read().splitlines()[1:]:
+            t = z.split()
+            if len(t) >= 4 and t[2] == '0x2' and t[3] != '00:00:00:00:00:00':
+                out[t[0]] = t[3].lower()
+    return out
+
+def arp_anstossen():
+    """Jede Adresse im Netz einmal ansprechen, damit der Host ihre MAC auflöst (keine Sonderrechte nötig)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setblocking(False)
+    for ip in ipaddress.ip_network(ARP_NETZ, strict=False).hosts():
+        try:
+            s.sendto(b'', (str(ip), 9))
+        except OSError:
+            pass
+    s.close()
+
+async def inventar_laden(s):
+    async with s.post('http://supervisor/core/api/services/todo/get_items?return_response',
+                      headers={'Authorization': 'Bearer ' + TOKEN},
+                      json={'entity_id': 'todo.netzwerk_gerate', 'status': ['needs_action', 'completed']}) as r:
+        d = await r.json()
+    items = d['service_response']['todo.netzwerk_gerate']['items']
+    macs, ip_name = set(), {}
+    for it in items:
+        sm = it.get('summary', '')
+        m = MAC_RE.search(sm)
+        if m:
+            macs.add(m.group(1).lower())
+        try:
+            beschr = json.loads(it.get('description') or '{}')
+            if isinstance(beschr, dict) and beschr.get('ip'):
+                ip_name[beschr['ip']] = sm.split(' · ')[0].replace('⏳ ', '').replace('⛔ ', '').strip()
+        except ValueError:
+            pass
+    return macs, ip_name
+
+async def arp_waechter():
+    if not TOKEN:
+        return
+    import aiohttp
+    try:
+        zustand = json.load(open(ARPF))
+    except Exception:
+        zustand = {'gemeldet': []}
+    await asyncio.sleep(30)
+    while True:
+        try:
+            await asyncio.to_thread(arp_anstossen)
+            await asyncio.sleep(4)
+            tab = {ip: mac for ip, mac in arp_lesen().items() if ipaddress.ip_address(ip) in ipaddress.ip_network(ARP_NETZ, strict=False)}
+            async with aiohttp.ClientSession() as s:
+                macs, ip_name = await inventar_laden(s)
+                unbekannt = [{'ip': ip, 'mac': mac, 'vorher': ip_name.get(ip, '')} for ip, mac in sorted(tab.items(), key=lambda x: ipaddress.ip_address(x[0])) if mac not in macs]
+                ARP.update(stand=int(time.time()), tabelle=tab, unbekannt=unbekannt, fehler='')
+                if ARP_MELDEN:
+                    for u in unbekannt:
+                        if u['mac'] in zustand['gemeldet']:
+                            continue
+                        details = f"IP {u['ip']}" + (f", vorher gehörte die IP zu „{u['vorher']}“" if u['vorher'] else '')
+                        AUDIT.eintragen('Vorfall', 'Unbekanntes Gerät im Heimnetz (ohne DHCP erkannt)', u['mac'], details, 'ARP-Wächter', 'Netz-Logsammler')
+                        if NAC_WEBHOOK:
+                            await s.post(NAC_WEBHOOK, json={'event': 'arp', 'mac': u['mac'], 'ip': u['ip'], 'hostname': '', 'vorher': u['vorher']})
+                        zustand['gemeldet'] = (zustand['gemeldet'] + [u['mac']])[-500:]
+                        log('ARP-Wächter: unbekanntes Gerät', u['mac'], u['ip'])
+                    json.dump(zustand, open(ARPF, 'w'))
+        except Exception as x:
+            ARP['fehler'] = repr(x)
+            log('ARP-Wächter:', repr(x))
+        await asyncio.sleep(ARP_INTERVALL)
+
 # ---------------------------------------------------------------- Suchseite (Ingress)
 def suchen(text, von, bis, limit=300):
     treffer, n = deque(maxlen=limit), 0
@@ -602,7 +685,9 @@ class UI(BaseHTTPRequestHandler):
             return
         u = urllib.parse.urlparse(self.path)
         p = urllib.parse.parse_qs(u.query)
-        if u.path.endswith('/api/stand'):
+        if u.path.endswith('/api/arp'):
+            self.antwort(json.dumps(dict(ARP, melden=ARP_MELDEN, netz=ARP_NETZ)), 'application/json')
+        elif u.path.endswith('/api/stand'):
             self.antwort(json.dumps(stand()), 'application/json')
         elif u.path.endswith('/api/audit'):
             ok, n, text = AUDIT.pruefen()
@@ -649,6 +734,7 @@ async def main():
     threading.Thread(target=ThreadingHTTPServer(('0.0.0.0', UI_PORT), UI).serve_forever, daemon=True).start()
     asyncio.create_task(ha_bruecke())
     asyncio.create_task(audit_sensor())
+    asyncio.create_task(arp_waechter())
     log(f'Syslog auf UDP/TCP {PORT}, Suchseite auf {UI_PORT}, Aufbewahrung {TAGE} Tage, Webhook {"aktiv" if WEBHOOK else "aus"}')
     async with srv:
         await zyklus()

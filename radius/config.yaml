@@ -1,0 +1,29 @@
+name: "Netz-RADIUS"
+version: "1.0.0"
+slug: radius
+description: "RADIUS-Server (FreeRADIUS) für die MAC-Authentifizierung der Switch-Ports – freigegebene Geräte kommen aus dem Geräte-Inventar in Home Assistant"
+url: "https://github.com/stefanzenz88/ha-addons"
+arch:
+  - amd64
+  - aarch64
+init: false
+host_network: true
+homeassistant_api: true
+startup: services
+boot: auto
+
+options:
+  radius_secret: ""
+  switches:
+    - "10.0.0.220=switchkeller2"
+    - "10.0.0.221=SW-Dachboden"
+  sync_sekunden: 60
+  nac_webhook_url: ""
+  audit_url: "http://127.0.0.1:8097/api/audit"
+schema:
+  radius_secret: password
+  switches:
+    - str
+  sync_sekunden: int(15,3600)
+  nac_webhook_url: str?
+  audit_url: str?

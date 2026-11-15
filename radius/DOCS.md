@@ -12,3 +12,10 @@ RADIUS-Server für die **MAC-Authentifizierung (MAB)** an den Switch-Ports. Ger�
 3. Auf den Switches: `radius-server host 10.0.0.245 key <Secret>` und MAC-Authentifizierung auf den gewünschten Ports – siehe Projekt-Doku.
 
 **Wichtig:** Ports von Uplinks, Home Assistant (dieser Server!), NAS und Firewall nie per RADIUS absichern. Für den Ausfall des Servers `aaa authentication mac-based chap-radius authorized` setzen, dann lassen die Switches die Geräte durch, wenn RADIUS nicht antwortet.
+
+## WLAN-802.1X (ab 1.1.0)
+1. In der App-Konfiguration unter `wlan_benutzer` je Person einen Eintrag anlegen (Name in Kleinbuchstaben, eigenes Kennwort). Optional `wlan_secret` für die Access Points setzen.
+2. App neu starten. Im Log stehen Fingerabdruck und Ablaufdatum des Server-Zertifikats.
+3. UniFi-Controller: Einstellungen → Profile → RADIUS → neues Profil, Auth-Server `10.0.0.245`, Port `1812`, Kennwort = `wlan_secret` (bzw. `radius_secret`).
+4. Neues WLAN mit Sicherheit „WPA2 Enterprise“ und diesem RADIUS-Profil.
+5. Am Gerät mit Benutzername und Kennwort verbinden und das Zertifikat `radius.zenz.home` (ausgestellt von „Netz Zenz RADIUS CA“) bestätigen. Für verwaltete Geräte kann die CA aus `/share/netz-radius/netz-zenz-radius-ca.crt` vorab installiert werden.

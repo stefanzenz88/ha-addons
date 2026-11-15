@@ -1,7 +1,7 @@
 name: "Netz-RADIUS"
-version: "1.0.0"
+version: "1.1.0"
 slug: radius
-description: "RADIUS-Server (FreeRADIUS) für die MAC-Authentifizierung der Switch-Ports – freigegebene Geräte kommen aus dem Geräte-Inventar in Home Assistant"
+description: "RADIUS-Server (FreeRADIUS) für die MAC-Authentifizierung der Switch-Ports und WLAN-802.1X (WPA-Enterprise) – freigegebene Geräte kommen aus dem Geräte-Inventar in Home Assistant"
 url: "https://github.com/stefanzenz88/ha-addons"
 arch:
   - amd64
@@ -11,6 +11,8 @@ host_network: true
 homeassistant_api: true
 startup: services
 boot: auto
+map:
+  - share:rw
 
 options:
   radius_secret: ""
@@ -20,6 +22,15 @@ options:
   sync_sekunden: 60
   nac_webhook_url: ""
   audit_url: "http://127.0.0.1:8097/api/audit"
+  message_authenticator_pflicht: true
+  wlan_aps:
+    - "10.0.0.210=AP-Gartenhuette"
+    - "10.0.0.211=AP-Buero"
+    - "10.0.0.212=AP-Dachboden"
+    - "10.0.0.213=AP-EG2"
+    - "10.0.0.214=AP-Keller"
+  wlan_secret: ""
+  wlan_benutzer: []
 schema:
   radius_secret: password
   switches:
@@ -27,3 +38,10 @@ schema:
   sync_sekunden: int(15,3600)
   nac_webhook_url: str?
   audit_url: str?
+  message_authenticator_pflicht: bool
+  wlan_aps:
+    - str
+  wlan_secret: password?
+  wlan_benutzer:
+    - name: match(^[a-zA-Z0-9][a-zA-Z0-9._-]{0,31}$)
+      passwort: password

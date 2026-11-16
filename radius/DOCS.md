@@ -22,3 +22,8 @@ RADIUS-Server für die **MAC-Authentifizierung (MAB)** an den Switch-Ports. Ger�
 
 ## Geräteprofile (ab 1.2.0)
 Im Heimnetz `http://<HA-IP>:8098/` öffnen (am iPhone in Safari). Dort gibt es je WLAN-Benutzer ein iPhone/iPad-Profil, das CA-Zertifikat und ein Windows-WLAN-Profil. Die Seite enthält nur öffentliche Daten (CA, SSID, Servername) – keine Kennwörter.
+
+## Benutzerverwaltung und Gast-Anfragen (ab 1.3.0)
+- Stammdaten und Status pflegst du im Dashboard (Netzwerk → Zugang). Dauerhafte Benutzer bekommen ihr Kennwort weiterhin nur über `wlan_benutzer` in der App-Konfiguration.
+- Gäste fragen unter `http://<HA-IP>:8098/anfrage` an. Stefan und Kristina bekommen einen Push mit Freigeben/Ablehnen. Nach der Freigabe schickt die App ein Zufallskennwort per Mail (Standard 24 Stunden gültig).
+- Für den Mailversand SMTP eintragen, z. B. Gmail: `smtp.gmail.com`, Port 587, Benutzer = Gmail-Adresse, Kennwort = App-Passwort (Google-Konto → Sicherheit → App-Passwörter).

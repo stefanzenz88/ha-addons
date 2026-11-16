@@ -447,7 +447,7 @@ code{{background:#f1f3f5;padding:2px 5px;word-break:break-all}}li{{margin:6px 0}
 <a class="b" href="/netz-zenz-radius-ca.cer">CA-Zertifikat (.cer)</a>
 <a class="b" href="/{ssid}.xml">WLAN-Profil (.xml)</a>
 <ol><li>CA-Datei öffnen → Zertifikat installieren → Lokaler Computer → <i>Vertrauenswürdige Stammzertifizierungsstellen</i>.</li>
-<li>Eingabeaufforderung: <code>netsh wlan add profile filename="%USERPROFILE%\Downloads\{ssid}.xml"</code></li>
+<li>Eingabeaufforderung: <code>netsh wlan add profile filename="%USERPROFILE%\\Downloads\\{ssid}.xml"</code></li>
 <li>Mit „{ssid}“ verbinden, Benutzer + Kennwort eingeben.</li></ol>
 </body></html>"""
 

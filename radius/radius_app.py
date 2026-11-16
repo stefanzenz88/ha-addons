@@ -22,6 +22,9 @@ MA_PFLICHT = bool(OPT.get('message_authenticator_pflicht', True))
 NAME_RE = re.compile(r'^[a-z0-9][a-z0-9._-]{0,31}$')
 BENUTZER = [b for b in OPT.get('wlan_benutzer', []) if NAME_RE.match((b.get('name') or '').lower()) and b.get('passwort')]
 CERTS = os.environ.get('CERTS', '/data/certs')
+PROFIL_PORT = int(OPT.get('profil_port', 8098))
+PROFIL_SSID = OPT.get('profil_ssid') or 'Zenz-Test'
+SERVERNAME = 'radius.zenz.home'
 SHARE = os.environ.get('SHARE', '/share/netz-radius')
 SYNC = int(OPT.get('sync_sekunden', 60))
 NAC_WEBHOOK = OPT.get('nac_webhook_url') or ''
@@ -363,6 +366,130 @@ def leser(proc):
         elif 'rror' in z or 'arning' in z:
             log(z)
 
+
+# ------------------------------------------------------------------ Geräteprofile (nur öffentliche Daten: CA, SSID, Servername)
+import base64, plistlib, uuid, html
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
+
+def ca_der():
+    pem = open(f'{CERTS}/ca.pem').read()
+    b64 = ''.join(z for z in pem.splitlines() if z and not z.startswith('-----'))
+    return base64.b64decode(b64)
+
+def ca_fingerprint(alg='sha256'):
+    r = subprocess.run(['openssl', 'x509', '-noout', '-fingerprint', f'-{alg}', '-in', f'{CERTS}/ca.pem'], capture_output=True, text=True).stdout.strip()
+    return r.split('=', 1)[-1]
+
+def mobileconfig(user, ssid):
+    ns = uuid.UUID('6f1c2b8e-5d4a-4c1e-9a3b-7e2f0d9c4b11')
+    ca_uuid = str(uuid.uuid5(ns, 'ca' + ca_fingerprint())).upper()
+    wifi_uuid = str(uuid.uuid5(ns, 'wifi' + ssid + user)).upper()
+    eap = {'AcceptEAPTypes': [25, 21], 'TLSTrustedServerNames': [SERVERNAME], 'TTLSInnerAuthentication': 'PAP',
+           'PayloadCertificateAnchorUUID': [ca_uuid], 'TLSAllowTrustExceptions': False}
+    if user:
+        eap['UserName'] = user
+    inhalt = [
+        {'PayloadType': 'com.apple.security.root', 'PayloadVersion': 1, 'PayloadIdentifier': f'home.zenz.radius.ca.{ca_uuid}',
+         'PayloadUUID': ca_uuid, 'PayloadDisplayName': 'Netz Zenz RADIUS CA', 'PayloadCertificateFileName': 'netz-zenz-radius-ca.cer',
+         'PayloadContent': ca_der()},
+        {'PayloadType': 'com.apple.wifi.managed', 'PayloadVersion': 1, 'PayloadIdentifier': f'home.zenz.wifi.{wifi_uuid}',
+         'PayloadUUID': wifi_uuid, 'PayloadDisplayName': f'WLAN {ssid}', 'SSID_STR': ssid, 'HIDDEN_NETWORK': False,
+         'AutoJoin': True, 'EncryptionType': 'WPA2', 'IsHotspot': False, 'ProxyType': 'None',
+         'EAPClientConfiguration': eap, 'PayloadCertificateUUID': None},
+    ]
+    del inhalt[1]['PayloadCertificateUUID']
+    profil = {'PayloadType': 'Configuration', 'PayloadVersion': 1, 'PayloadIdentifier': f'home.zenz.netz.{ssid.lower()}.{user or "alle"}',
+              'PayloadUUID': str(uuid.uuid5(ns, 'profil' + ssid + user)).upper(), 'PayloadDisplayName': f'Netz Zenz – WLAN {ssid}',
+              'PayloadDescription': f'Vertraut der Netz-Zenz-CA nur für {SERVERNAME} und richtet das WLAN {ssid} (WPA2-Enterprise) ein. Enthält kein Kennwort.',
+              'PayloadOrganization': 'Netz Zenz', 'PayloadRemovalDisallowed': False, 'PayloadContent': inhalt}
+    return plistlib.dumps(profil)
+
+def windows_xml(ssid):
+    fp = ca_fingerprint('sha1').replace(':', ' ').lower()  # Windows erwartet den SHA-1-Thumbprint
+    hexssid = ssid.encode().hex().upper()
+    return f"""<?xml version="1.0"?>
+<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">
+  <name>{html.escape(ssid)}</name>
+  <SSIDConfig><SSID><hex>{hexssid}</hex><name>{html.escape(ssid)}</name></SSID></SSIDConfig>
+  <connectionType>ESS</connectionType><connectionMode>auto</connectionMode>
+  <MSM><security>
+    <authEncryption><authentication>WPA2</authentication><encryption>AES</encryption><useOneX>true</useOneX></authEncryption>
+    <OneX xmlns="http://www.microsoft.com/networking/OneX/v1"><authMode>user</authMode>
+      <EAPConfig><EapHostConfig xmlns="http://www.microsoft.com/provisioning/EapHostConfig">
+        <EapMethod><Type xmlns="http://www.microsoft.com/provisioning/EapCommon">25</Type><VendorId xmlns="http://www.microsoft.com/provisioning/EapCommon">0</VendorId><VendorType xmlns="http://www.microsoft.com/provisioning/EapCommon">0</VendorType><AuthorId xmlns="http://www.microsoft.com/provisioning/EapCommon">0</AuthorId></EapMethod>
+        <Config xmlns="http://www.microsoft.com/provisioning/EapHostConfig"><Eap xmlns="http://www.microsoft.com/provisioning/BaseEapConnectionPropertiesV1"><Type>25</Type>
+          <EapType xmlns="http://www.microsoft.com/provisioning/MsPeapConnectionPropertiesV1">
+            <ServerValidation><DisableUserPromptForServerValidation>true</DisableUserPromptForServerValidation><ServerNames>{SERVERNAME}</ServerNames><TrustedRootCA>{fp}</TrustedRootCA></ServerValidation>
+            <FastReconnect>true</FastReconnect><InnerEapOptional>false</InnerEapOptional>
+            <Eap xmlns="http://www.microsoft.com/provisioning/BaseEapConnectionPropertiesV1"><Type>26</Type><EapType xmlns="http://www.microsoft.com/provisioning/MsChapV2ConnectionPropertiesV1"><UseWinLogonCredentials>false</UseWinLogonCredentials></EapType></Eap>
+            <EnableQuarantineChecks>false</EnableQuarantineChecks><RequireCryptoBinding>false</RequireCryptoBinding>
+            <PeapExtensions><PerformServerValidation xmlns="http://www.microsoft.com/provisioning/MsPeapConnectionPropertiesV2">true</PerformServerValidation><AcceptServerName xmlns="http://www.microsoft.com/provisioning/MsPeapConnectionPropertiesV2">true</AcceptServerName></PeapExtensions>
+          </EapType></Eap></Config>
+      </EapHostConfig></EAPConfig>
+    </OneX>
+  </security></MSM>
+</WLANProfile>
+"""
+
+SEITE = """<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Netz Zenz – WLAN einrichten</title><style>body{{font-family:-apple-system,Segoe UI,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;color:#1a1a1a}}
+h1{{font-size:22px}}a.b{{display:block;padding:14px 16px;margin:10px 0;background:#0b5cad;color:#fff;text-decoration:none;font-size:17px}}
+code{{background:#f1f3f5;padding:2px 5px;word-break:break-all}}li{{margin:6px 0}}.k{{color:#555;font-size:14px}}</style></head><body>
+<h1>WLAN „{ssid}“ einrichten</h1>
+<p class="k">Server-Zertifikat: <b>{server}</b> · CA „Netz Zenz RADIUS CA“<br>CA-Fingerabdruck (SHA-256): <code>{fp}</code></p>
+<h2>iPhone / iPad</h2>
+{nutzer}
+<ol><li>Vorher unter Einstellungen → WLAN bei „{ssid}“ auf ⓘ → <i>Dieses Netzwerk ignorieren</i>.</li>
+<li>Profil hier in <b>Safari</b> laden → <i>Zulassen</i>.</li><li>Einstellungen → <i>Profil geladen</i> → Installieren (Code des iPhones).</li>
+<li>Beim Verbinden nur noch das WLAN-Kennwort eingeben – keine Zertifikatsfrage mehr.</li></ol>
+<h2>Windows</h2>
+<a class="b" href="/netz-zenz-radius-ca.cer">CA-Zertifikat (.cer)</a>
+<a class="b" href="/{ssid}.xml">WLAN-Profil (.xml)</a>
+<ol><li>CA-Datei öffnen → Zertifikat installieren → Lokaler Computer → <i>Vertrauenswürdige Stammzertifizierungsstellen</i>.</li>
+<li>Eingabeaufforderung: <code>netsh wlan add profile filename="%USERPROFILE%\Downloads\{ssid}.xml"</code></li>
+<li>Mit „{ssid}“ verbinden, Benutzer + Kennwort eingeben.</li></ol>
+</body></html>"""
+
+class Profile(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+    def senden(self, daten, typ, name=None):
+        self.send_response(200)
+        self.send_header('Content-Type', typ)
+        if name:
+            self.send_header('Content-Disposition', f'attachment; filename="{name}"')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(daten)
+    def do_GET(self):
+        u = urlparse(self.path)
+        q = parse_qs(u.query)
+        try:
+            if u.path in ('/', '/index.html'):
+                knoepfe = ''.join(f'<a class="b" href="/profil.mobileconfig?u={html.escape(b["name"].lower())}">Profil für {html.escape(b["name"].lower())}</a>' for b in BENUTZER)
+                knoepfe += '<a class="b" href="/profil.mobileconfig">Profil ohne Benutzernamen</a>'
+                return self.senden(SEITE.format(ssid=html.escape(PROFIL_SSID), server=SERVERNAME, fp=ca_fingerprint(), nutzer=knoepfe).encode(), 'text/html; charset=utf-8')
+            if u.path == '/profil.mobileconfig':
+                user = (q.get('u') or [''])[0].lower()
+                if user and user not in [b['name'].lower() for b in BENUTZER]:
+                    user = ''
+                return self.senden(mobileconfig(user, PROFIL_SSID), 'application/x-apple-aspen-config', f'Netz-Zenz-{PROFIL_SSID}.mobileconfig')
+            if u.path in ('/netz-zenz-radius-ca.cer', '/ca.cer'):
+                return self.senden(ca_der(), 'application/pkix-cert', 'netz-zenz-radius-ca.cer')
+            if u.path == f'/{PROFIL_SSID}.xml':
+                return self.senden(windows_xml(PROFIL_SSID).encode(), 'application/xml', f'{PROFIL_SSID}.xml')
+        except Exception as x:
+            log('Profilseite:', repr(x))
+        self.send_response(404)
+        self.end_headers()
+
+def profil_server():
+    try:
+        ThreadingHTTPServer(('0.0.0.0', PROFIL_PORT), Profile).serve_forever()
+    except Exception as x:
+        log('Profilseite nicht gestartet:', repr(x))
+
 def main():
     if not SECRET:
         log('Kein radius_secret gesetzt – bitte in der App-Konfiguration eintragen. Server startet nicht.')
@@ -378,6 +505,9 @@ def main():
     config_schreiben()
     anzahl, _ = sync()
     log(f'Inventar: {anzahl} freigegebene Geräte; Switches: {", ".join(f"{n} ({i})" for i, n in SWITCHES.items())}')
+    if APS and PROFIL_PORT:
+        threading.Thread(target=profil_server, daemon=True).start()
+        log(f'Geräteprofile: http://<HA-IP>:{PROFIL_PORT}/ (WLAN {PROFIL_SSID})')
     if APS:
         log(f'WLAN-802.1X: {len(APS)} Access Points, {len(BENUTZER)} Benutzer ({", ".join(b["name"].lower() for b in BENUTZER) or "noch keine"})')
     proc = subprocess.Popen([RADIUSD, *RADIUSD_ARGS, '-f', '-l', 'stdout'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)

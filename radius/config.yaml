@@ -1,5 +1,5 @@
 name: "Netz-RADIUS"
-version: "1.1.0"
+version: "1.2.0"
 slug: radius
 description: "RADIUS-Server (FreeRADIUS) für die MAC-Authentifizierung der Switch-Ports und WLAN-802.1X (WPA-Enterprise) – freigegebene Geräte kommen aus dem Geräte-Inventar in Home Assistant"
 url: "https://github.com/stefanzenz88/ha-addons"
@@ -31,6 +31,8 @@ options:
     - "10.0.0.214=AP-Keller"
   wlan_secret: ""
   wlan_benutzer: []
+  profil_port: 8098
+  profil_ssid: "Zenz-Test"
 schema:
   radius_secret: password
   switches:
@@ -45,3 +47,5 @@ schema:
   wlan_benutzer:
     - name: match(^[a-zA-Z0-9][a-zA-Z0-9._-]{0,31}$)
       passwort: password
+  profil_port: port
+  profil_ssid: str

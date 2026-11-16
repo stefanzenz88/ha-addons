@@ -19,3 +19,6 @@ RADIUS-Server für die **MAC-Authentifizierung (MAB)** an den Switch-Ports. Ger�
 3. UniFi-Controller: Einstellungen → Profile → RADIUS → neues Profil, Auth-Server `10.0.0.245`, Port `1812`, Kennwort = `wlan_secret` (bzw. `radius_secret`).
 4. Neues WLAN mit Sicherheit „WPA2 Enterprise“ und diesem RADIUS-Profil.
 5. Am Gerät mit Benutzername und Kennwort verbinden und das Zertifikat `radius.zenz.home` (ausgestellt von „Netz Zenz RADIUS CA“) bestätigen. Für verwaltete Geräte kann die CA aus `/share/netz-radius/netz-zenz-radius-ca.crt` vorab installiert werden.
+
+## Geräteprofile (ab 1.2.0)
+Im Heimnetz `http://<HA-IP>:8098/` öffnen (am iPhone in Safari). Dort gibt es je WLAN-Benutzer ein iPhone/iPad-Profil, das CA-Zertifikat und ein Windows-WLAN-Profil. Die Seite enthält nur öffentliche Daten (CA, SSID, Servername) – keine Kennwörter.

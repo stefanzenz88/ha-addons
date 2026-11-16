@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+- Geräteprofile im Heimnetz unter `http://<HA-IP>:8098/`: iPhone/iPad-Konfigurationsprofil (CA + WLAN mit festem Servernamen `radius.zenz.home`, optional Benutzername, kein Kennwort), CA als `.cer` und Windows-WLAN-Profil mit Serverprüfung. Keine Zertifikatsabfrage mehr beim Verbinden, Schutz gegen gefälschte WLANs.
+- Neue Optionen `profil_port` und `profil_ssid`.
+
 ## 1.1.0
 - WLAN-802.1X (WPA2/WPA3-Enterprise) für UniFi: PEAP-MSCHAPv2 und TTLS-PAP, eigene CA + Server-Zertifikat `radius.zenz.home` (825 Tage, automatische Erneuerung 30 Tage vor Ablauf), CA zum Herunterladen unter `/share/netz-radius/netz-zenz-radius-ca.crt`.
 - Neue Optionen `wlan_aps` (Access Points als RADIUS-Clients), `wlan_secret` (eigenes Kennwort für die APs, leer = `radius_secret`), `wlan_benutzer` (Name + Kennwort je Person).

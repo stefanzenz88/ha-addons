@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.0p20
+
+- Checkmk Community 2.5.0p20 (automatisch aus Docker Hub übernommen)
+
 ## 2.5.0p19-1
 
 - Eigene NagVis-Symbole im Stil „Neon“ (17 Gerätetypen × 14 Zustände, Namen `zenz_<typ>`), werden beim Start in die Site kopiert
